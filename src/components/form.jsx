@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import axios from "axios";
+import API from "../services/api";
 
 const Formpage = () => {
   const [formData, setFormData] = useState({
@@ -25,9 +25,13 @@ const Formpage = () => {
     e.preventDefault();
     console.log("Submitted Data:", formData);
     try {
-      const response = await axios.post(
-        "http://localhost:5000/api/user/signup",
-        formData
+      const response = await API.post(
+        "/auth/register",
+        {
+          name: `${formData.firstname} ${formData.lastname}`,
+          email: formData.email,
+          password: formData.password
+        }
       );
       
       setMessage(response.data.message);
