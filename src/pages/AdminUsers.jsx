@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import API from '../services/api'
 
 export default function AdminUsers() {
   const [users, setUsers] = useState([])
@@ -18,22 +19,41 @@ export default function AdminUsers() {
   const navigate = useNavigate()
 
   useEffect(() => {
-    // Check if user is admin
     const userRole = localStorage.getItem('role')
-    if (userRole !== 'admin') {
+    const token = localStorage.getItem('token')
+    
+    if (!token || userRole !== 'admin') {
       navigate('/login')
+      return
     }
-
-    // Load demo users
-    const demoUsers = [
-      { id: 1, name: 'Sarah Johnson', email: 'sarah@email.com', phone: '+91 98765 43210', role: 'User', status: 'Active', dateCreated: '2024-03-15' },
-      { id: 2, name: 'Emma Davis', email: 'emma@email.com', phone: '+91 98765 43211', role: 'User', status: 'Active', dateCreated: '2024-03-14' },
-      { id: 3, name: 'Lisa Chen', email: 'lisa@email.com', phone: '+91 98765 43212', role: 'User', status: 'Blocked', dateCreated: '2024-03-13' },
-      { id: 4, name: 'Admin User', email: 'admin@sapphire.com', phone: '+91 98765 43213', role: 'Admin', status: 'Active', dateCreated: '2024-01-01' },
-      { id: 5, name: 'John Smith', email: 'john@email.com', phone: '+91 98765 43214', role: 'User', status: 'Active', dateCreated: '2024-03-12' }
-    ]
-    setUsers(demoUsers)
+    
+    fetchUsers()
   }, [navigate])
+
+  const fetchUsers = async () => {
+    const token = localStorage.getItem('token')
+    
+    console.log('Authorization token:', token ? token.substring(0, 20) + '...' : 'No token')
+    
+    try {
+      const response = await API.get('/admin/users')
+      console.log('API response data:', response.data)
+      
+      const usersData = response.data.users || response.data || []
+      const formattedUsers = usersData.map(user => ({
+        ...user,
+        id: user._id || user.id,
+        displayId: (user._id || user.id || '').toString().slice(-4),
+        displayRole: user.role === 'admin' ? 'Admin' : 'User',
+        displayStatus: user.status === true ? 'Active' : 'Blocked',
+        dateCreated: user.createdAt ? new Date(user.createdAt).toISOString().split('T')[0] : 'N/A'
+      }))
+      setUsers(formattedUsers)
+    } catch (error) {
+      console.error('API error:', error.response?.status, error.response?.data || error.message)
+      setUsers([])
+    }
+  }
 
   const filteredUsers = users.filter(user => {
     const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -181,21 +201,21 @@ export default function AdminUsers() {
               <tbody>
                 {sortedUsers.map(user => (
                   <tr key={user.id}>
-                    <td>#{user.id.toString().padStart(3, '0')}</td>
-                    <td>{user.name}</td>
-                    <td>{user.email}</td>
-                    <td>{user.phone}</td>
+                    <td>#{user.displayId || '0000'}</td>
+                    <td>{user.name || 'N/A'}</td>
+                    <td>{user.email || 'N/A'}</td>
+                    <td>{user.phone || 'N/A'}</td>
                     <td>
-                      <span className={`role-badge ${user.role.toLowerCase()}`}>
-                        {user.role}
+                      <span className={`role-badge ${(user.role || 'user').toLowerCase()}`}>
+                        {user.displayRole || 'User'}
                       </span>
                     </td>
                     <td>
-                      <span className={`status-badge ${user.status.toLowerCase()}`}>
-                        {user.status}
+                      <span className={`status-badge ${(user.displayStatus || 'active').toLowerCase()}`}>
+                        {user.displayStatus || 'Active'}
                       </span>
                     </td>
-                    <td>{user.dateCreated}</td>
+                    <td>{user.dateCreated || 'N/A'}</td>
                     <td>
                       <div className="action-buttons">
                         <button 
@@ -238,32 +258,32 @@ export default function AdminUsers() {
                     {user.name.charAt(0).toUpperCase()}
                   </div>
                   <div className="mobile-user-info">
-                    <h3 className="mobile-user-name">{user.name}</h3>
-                    <p className="mobile-user-id">#{user.id.toString().padStart(3, '0')}</p>
+                    <h3 className="mobile-user-name">{user.name || 'N/A'}</h3>
+                    <p className="mobile-user-id">#{user.displayId || '0000'}</p>
                   </div>
-                  <span className={`status-badge ${user.status.toLowerCase()}`}>
-                    {user.status}
+                  <span className={`status-badge ${(user.displayStatus || 'active').toLowerCase()}`}>
+                    {user.displayStatus || 'Active'}
                   </span>
                 </div>
                 
                 <div className="mobile-user-details">
                   <div className="mobile-detail-item">
                     <span className="mobile-detail-label">Email</span>
-                    <span className="mobile-detail-value">{user.email}</span>
+                    <span className="mobile-detail-value">{user.email || 'N/A'}</span>
                   </div>
                   <div className="mobile-detail-item">
                     <span className="mobile-detail-label">Phone</span>
-                    <span className="mobile-detail-value">{user.phone}</span>
+                    <span className="mobile-detail-value">{user.phone || 'N/A'}</span>
                   </div>
                   <div className="mobile-detail-item">
                     <span className="mobile-detail-label">Role</span>
-                    <span className={`role-badge ${user.role.toLowerCase()}`}>
-                      {user.role}
+                    <span className={`role-badge ${(user.role || 'user').toLowerCase()}`}>
+                      {user.displayRole || 'User'}
                     </span>
                   </div>
                   <div className="mobile-detail-item">
                     <span className="mobile-detail-label">Date Created</span>
-                    <span className="mobile-detail-value">{user.dateCreated}</span>
+                    <span className="mobile-detail-value">{user.dateCreated || 'N/A'}</span>
                   </div>
                 </div>
                 

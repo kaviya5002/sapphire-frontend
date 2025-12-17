@@ -1,19 +1,19 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import API from '../services/api'
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState({
-    totalUsers: 1247,
-    totalProducts: 20,
-    totalOrders: 856,
-    lowStockItems: 3
+    totalUsers: 0,
+    totalProducts: 0,
+    totalOrders: 0,
+    lowStockItems: 0
   })
   const [isLoading, setIsLoading] = useState(true)
   
   const navigate = useNavigate()
 
   useEffect(() => {
-    // Small delay to ensure localStorage is ready
     const checkAuth = () => {
       const userRole = localStorage.getItem('role')
       const token = localStorage.getItem('token')
@@ -21,12 +21,42 @@ export default function AdminDashboard() {
       if (!token || userRole !== 'admin') {
         navigate('/login')
       } else {
-        setIsLoading(false)
+        fetchDashboardData()
       }
     }
     
     setTimeout(checkAuth, 100)
   }, [navigate])
+
+  const fetchDashboardData = async () => {
+    try {
+      setIsLoading(true)
+      
+      // Fetch all data in parallel
+      const [usersRes, productsRes, ordersRes] = await Promise.all([
+        API.get('/admin/users').catch(() => ({ data: [] })),
+        API.get('/products').catch(() => ({ data: [] })),
+        API.get('/orders').catch(() => ({ data: [] }))
+      ])
+      
+      const users = usersRes.data.users || usersRes.data || []
+      const products = productsRes.data.products || productsRes.data || []
+      const orders = ordersRes.data.orders || ordersRes.data || []
+      
+      const lowStock = products.filter(p => p.stock <= 10).length
+      
+      setStats({
+        totalUsers: users.length,
+        totalProducts: products.length,
+        totalOrders: orders.length,
+        lowStockItems: lowStock
+      })
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   if (isLoading) {
     return (

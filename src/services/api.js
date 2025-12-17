@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const API = axios.create({
-  baseURL: "http://localhost:5000/api",
+  baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000/api",
 });
 
 // Add JWT token to requests
@@ -20,7 +20,7 @@ API.interceptors.request.use(
   }
 );
 
-// Add response interceptor for debugging
+// Add response interceptor for debugging and error handling
 API.interceptors.response.use(
   (response) => {
     console.log('API Response:', response.status, response.data);
@@ -28,6 +28,15 @@ API.interceptors.response.use(
   },
   (error) => {
     console.error('Response error:', error.response?.status, error.response?.data);
+    
+    // Handle common errors
+    if (error.response?.status === 401) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      localStorage.removeItem('role');
+      window.location.href = '/login';
+    }
+    
     return Promise.reject(error);
   }
 );

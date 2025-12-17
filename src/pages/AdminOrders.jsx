@@ -13,39 +13,78 @@ export default function AdminOrders() {
   const navigate = useNavigate()
 
   useEffect(() => {
-    // Check if user is admin
+    const token = localStorage.getItem('token')
     const role = localStorage.getItem('role')
-    if (role !== 'admin') {
+    
+    if (!token || role !== 'admin') {
       navigate('/login')
+      return
     }
-
+    
     fetchOrders()
   }, [navigate])
 
   const fetchOrders = async () => {
+    const token = localStorage.getItem('token')
+    if (!token) {
+      console.log('No token available for orders API request')
+      navigate('/login')
+      return
+    }
+    
     try {
+      console.log('Fetching orders with token:', token.substring(0, 20) + '...')
       const response = await API.get('/orders')
-      const ordersData = response.data.orders || response.data || []
+      console.log('Orders API response:', response.data)
+      
+      let ordersData = []
+      if (response.data) {
+        if (Array.isArray(response.data)) {
+          ordersData = response.data
+        } else if (response.data.orders && Array.isArray(response.data.orders)) {
+          ordersData = response.data.orders
+        } else if (response.data.data && Array.isArray(response.data.data)) {
+          ordersData = response.data.data
+        }
+      }
+      
+      console.log('Found', ordersData.length, 'orders')
+      
       const formattedOrders = ordersData.map(order => ({
         ...order,
-        date: new Date(order.createdAt || order.date).toLocaleDateString(),
-        customer: order.customerInfo?.name || order.customer,
-        email: order.customerInfo?.email || order.email,
-        items: order.items?.length || order.items || 0,
-        products: order.items?.map(item => item.name) || order.products || []
+        id: order._id || order.id,
+        date: order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'N/A',
+        customer: order.customerName || order.customer?.name || order.customer || 'N/A',
+        email: order.customerEmail || order.customer?.email || order.email || 'N/A',
+        total: order.totalAmount || order.total || 0,
+        status: order.status || 'pending',
+        items: Array.isArray(order.items) ? order.items.length : (order.products?.length || 0),
+        products: Array.isArray(order.items) ? order.items.map(item => item.name || 'Product') : []
       }))
+      
       setOrders(formattedOrders)
     } catch (error) {
-      console.error('Error fetching orders:', error)
+      console.error('Error fetching orders:', error.response?.status, error.response?.data || error.message)
+      if (error.response?.status === 401) {
+        console.log('Unauthorized, redirecting to login')
+        localStorage.removeItem('token')
+        localStorage.removeItem('user')
+        localStorage.removeItem('role')
+        navigate('/login')
+      }
       setOrders([])
     }
   }
 
   useEffect(() => {
     let filtered = orders.filter(order => {
-      const matchesSearch = order.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           order.email.toLowerCase().includes(searchTerm.toLowerCase())
+      const customer = order.customer || ''
+      const orderId = (order.id || '').toString()
+      const email = order.email || ''
+      
+      const matchesSearch = customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           orderId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           email.toLowerCase().includes(searchTerm.toLowerCase())
       const matchesStatus = statusFilter === 'all' || order.status === statusFilter
       return matchesSearch && matchesStatus
     })
@@ -201,37 +240,44 @@ export default function AdminOrders() {
                 </tr>
               </thead>
               <tbody>
-                {filteredOrders.map(order => (
-                  <tr key={order.id}>
-                    <td>
-                      <strong>{order.id}</strong>
+                {filteredOrders.length === 0 ? (
+                  <tr>
+                    <td colSpan="7" style={{ textAlign: 'center', padding: '40px' }}>
+                      No orders found
                     </td>
-                    <td>
-                      <div>
-                        <strong>{order.customer}</strong>
+                  </tr>
+                ) : (
+                  filteredOrders.map(order => (
+                    <tr key={order.id || order._id}>
+                      <td>
+                        <strong>{(order.id || '').toString().slice(-6) || 'N/A'}</strong>
+                      </td>
+                      <td>
+                        <div>
+                          <strong>{order.customer || 'N/A'}</strong>
+                          <br />
+                          <small style={{ color: 'var(--maroon)', opacity: 0.8 }}>
+                            {order.email || 'N/A'}
+                          </small>
+                        </div>
+                      </td>
+                      <td>{order.date || 'N/A'}</td>
+                      <td>
+                        <span>{order.items || 0} items</span>
                         <br />
-                        <small style={{ color: 'var(--maroon)', opacity: 0.8 }}>
-                          {order.email}
+                        <small style={{ color: 'var(--maroon)', opacity: 0.7 }}>
+                          {Array.isArray(order.products) && order.products.length > 0 ? (
+                            order.products.slice(0, 2).join(', ') + (order.products.length > 2 ? '...' : '')
+                          ) : (
+                            'Product details'
+                          )}
                         </small>
-                      </div>
-                    </td>
-                    <td>{order.date}</td>
-                    <td>
-                      <span>{Array.isArray(order.items) ? order.items.length : order.items} items</span>
-                      <br />
-                      <small style={{ color: 'var(--maroon)', opacity: 0.7 }}>
-                        {Array.isArray(order.products) ? (
-                          order.products.slice(0, 2).join(', ') + (order.products.length > 2 ? '...' : '')
-                        ) : (
-                          'Product details'
-                        )}
-                      </small>
-                    </td>
-                    <td>
-                      <strong style={{ color: 'var(--accent-1)' }}>
-                        ₹{order.total}
-                      </strong>
-                    </td>
+                      </td>
+                      <td>
+                        <strong style={{ color: 'var(--accent-1)' }}>
+                          ₹{order.total || 0}
+                        </strong>
+                      </td>
                     <td>
                       <select
                         value={order.status}
@@ -263,7 +309,8 @@ export default function AdminOrders() {
                       </div>
                     </td>
                   </tr>
-                ))}
+                  ))
+                )}
               </tbody>
             </table>
             {filteredOrders.length === 0 && (

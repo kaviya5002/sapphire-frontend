@@ -29,25 +29,43 @@ export default function AdminProducts() {
   const navigate = useNavigate()
 
   useEffect(() => {
-    const role = localStorage.getItem('role')
     const token = localStorage.getItem('token')
+    const role = localStorage.getItem('role')
     
-    if (!token || role !== 'admin') {
+    if (!token) {
+      console.log('No token found, redirecting to login')
       navigate('/login')
       return
     }
     
+    if (role !== 'admin') {
+      console.log('User is not admin, redirecting to login')
+      navigate('/login')
+      return
+    }
+    
+    console.log('Admin authenticated, fetching products')
     fetchProducts()
   }, [navigate])
 
 
 
   const fetchProducts = async () => {
+    const token = localStorage.getItem('token')
+    if (!token) {
+      console.log('No token available for API request')
+      navigate('/login')
+      return
+    }
+    
     try {
       setLoading(true)
-      const response = await API.get('/products')
-      let productsData = []
+      console.log('Fetching products with token:', token.substring(0, 20) + '...')
       
+      const response = await API.get('/products')
+      console.log('Products API response status:', response.status)
+      
+      let productsData = []
       if (response.data) {
         if (Array.isArray(response.data)) {
           productsData = response.data
@@ -58,6 +76,8 @@ export default function AdminProducts() {
         }
       }
       
+      console.log('Found', productsData.length, 'products')
+      
       const formattedProducts = productsData.map(product => ({
         ...product,
         id: product._id || product.id,
@@ -67,7 +87,14 @@ export default function AdminProducts() {
       
       setProducts(formattedProducts)
     } catch (error) {
-      console.error('Error fetching products:', error)
+      console.error('Error fetching products:', error.response?.status, error.response?.data || error.message)
+      if (error.response?.status === 401) {
+        console.log('Unauthorized, redirecting to login')
+        localStorage.removeItem('token')
+        localStorage.removeItem('user')
+        localStorage.removeItem('role')
+        navigate('/login')
+      }
       setProducts([])
     } finally {
       setLoading(false)
